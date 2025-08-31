@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surah Smasher</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #e0f2fe; /* Light blue background */
+            font-family: 'Inter', sans-serif;
+            color: #1a237e;
+        }
+        canvas {
+            display: block;
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        #game-container {
+            position: relative;
+        }
+        #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 2rem 3rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #message-box h2 {
+            font-size: 2.5rem;
+            margin: 0 0 1rem 0;
+            color: #1a237e;
+        }
+        #message-box p {
+            font-size: 1.25rem;
+            color: #4a4a4a;
+        }
+        .btn {
+            padding: 0.75rem 2rem;
+            margin-top: 1.5rem;
+            border: none;
+            border-radius: 50px;
+            background-color: #64b5f6;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="message-box">
+            <h2 id="message-title">Find the Surahs Number</h2>
+            <p id="message-content">Click the number that matches the Surah's order in the Quran.</p>
+            <button id="restartBtn" class="btn">Play</button>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            // Get the canvas and its context
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const messageBox = document.getElementById('message-box');
+            const messageTitle = document.getElementById('message-title');
+            const messageContent = document.getElementById('message-content');
+            const restartBtn = document.getElementById('restartBtn');
+            
+            // Define game constants and variables
+            const surahs = [
+                { name: "Al-Fatiha", number: 1 },
+                { name: "Al-Baqarah", number: 2 },
+                { name: "Al-Imran", number: 3 },
+                { name: "An-Nisa", number: 4 },
+                { name: "Al-Ma'idah", number: 5 },
+                { name: "Al-An'am", number: 6 },
+                { name: "Al-A'raf", number: 7 },
+                { name: "Al-Anfal", number: 8 },
+                { name: "At-Tawbah", number: 9 },
+                { name: "Yunus", number: 10 }
+            ];
+
+            let bubbles = [];
+            let particles = []; // New array for particles
+            let currentLevel = 0;
+            let currentSurah = {};
+            let isPaused = true;
+            let audioContext;
+            let audioPop, audioWrong;
+            let gameAnimationFrameId = null;
+
+            // Define Bubble class for number objects
+            class Bubble {
+                constructor(x, y, radius, number, color) {
+                    this.x = x;
+                    this.y = y;
+                    this.radius = radius;
+                    this.number = number;
+                    this.color = color;
+                    this.vx = (Math.random() - 0.5) * 2; // Random horizontal velocity
+                    this.vy = (Math.random() - 0.5) * 2; // Random vertical velocity
+                }
+
+                draw() {
+                    // Draw bubble circle
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+                    ctx.shadowBlur = 10;
+                    ctx.fill();
+                    ctx.closePath();
+                    ctx.shadowBlur = 0;
+
+                    // Draw number text inside bubble
+                    ctx.fillStyle = '#fff';
+                    ctx.font = `bold ${this.radius * 0.7}px 'Inter', sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.number, this.x, this.y);
+                }
+
+                update() {
+                    // Update position
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Bounce off walls
+                    if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+                        this.vx *= -1;
+                    }
+                    if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
+                        this.vy *= -1;
+                    }
+                }
+            }
+            
+            // New class for the magical particles
+            class Particle {
+                constructor(x, y) {
+                    this.x = x;
+                    this.y = y;
+                    this.radius = Math.random() * 2 + 1;
+                    this.alpha = 1;
+                    this.vx = (Math.random() - 0.5) * (Math.random() * 5 + 1);
+                    this.vy = (Math.random() - 0.5) * (Math.random() * 5 + 1);
+                    this.color = `hsl(${Math.random() * 360}, 70%, 70%)`;
+                }
+
+                draw() {
+                    ctx.globalAlpha = this.alpha;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.closePath();
+                    ctx.globalAlpha = 1; // Reset alpha
+                }
+
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.alpha -= 0.02; // Fade out over time
+                }
+            }
+
+            // Function to show a message box
+            function showMessage(title, content, buttonText) {
+                isPaused = true;
+                messageTitle.textContent = title;
+                messageContent.textContent = content;
+                restartBtn.textContent = buttonText;
+                messageBox.style.display = 'flex';
+                if (gameAnimationFrameId) {
+                    cancelAnimationFrame(gameAnimationFrameId);
+                }
+            }
+
+            // Function to hide the message box
+            function hideMessage() {
+                isPaused = false;
+                messageBox.style.display = 'none';
+                gameLoop();
+            }
+
+            // Function to generate a simple "pop" sound
+            function createPopSound() {
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 800;
+                gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            }
+            
+            // Function to generate a simple "wrong" sound
+            function createWrongSound() {
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.type = 'triangle';
+                oscillator.frequency.value = 200;
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.2);
+            }
+
+            // Function to draw the main game elements
+            function draw() {
+                // Clear the canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw the central "cute block" with the Surah name
+                const blockWidth = canvas.width * 0.35;
+                const blockHeight = canvas.height * 0.15;
+                const blockX = (canvas.width - blockWidth) / 2;
+                const blockY = (canvas.height - blockHeight) / 2;
+                const cornerRadius = 20;
+
+                // Draw rounded rectangle
+                ctx.beginPath();
+                ctx.moveTo(blockX + cornerRadius, blockY);
+                ctx.lineTo(blockX + blockWidth - cornerRadius, blockY);
+                ctx.quadraticCurveTo(blockX + blockWidth, blockY, blockX + blockWidth, blockY + cornerRadius);
+                ctx.lineTo(blockX + blockWidth, blockY + blockHeight - cornerRadius);
+                ctx.quadraticCurveTo(blockX + blockWidth, blockY + blockHeight, blockX + blockWidth - cornerRadius, blockY + blockHeight);
+                ctx.lineTo(blockX + cornerRadius, blockY + blockHeight);
+                ctx.quadraticCurveTo(blockX, blockY + blockHeight, blockX, blockY + blockHeight - cornerRadius);
+                ctx.lineTo(blockX, blockY + cornerRadius);
+                ctx.quadraticCurveTo(blockX, blockY, blockX + cornerRadius, blockY);
+                ctx.closePath();
+
+                // Style the block
+                ctx.fillStyle = '#bbdefb'; /* Light blue block */
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Draw the Surah text
+                ctx.fillStyle = '#1a237e'; /* Dark blue text */
+                ctx.font = `bold ${blockHeight * 0.4}px 'Inter', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(currentSurah.name, canvas.width / 2, canvas.height / 2);
+
+                // Draw and update bubbles
+                for (const bubble of bubbles) {
+                    bubble.draw();
+                }
+
+                // Draw and update particles
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    particles[i].update();
+                    particles[i].draw();
+                    if (particles[i].alpha <= 0) {
+                        particles.splice(i, 1);
+                    }
+                }
+            }
+
+            // Main game update loop
+            function update() {
+                // Update bubbles' positions
+                for (const bubble of bubbles) {
+                    bubble.update();
+                }
+            }
+
+            // The main animation loop
+            function gameLoop() {
+                if (isPaused) return;
+                update();
+                draw();
+                gameAnimationFrameId = requestAnimationFrame(gameLoop);
+            }
+            
+            // Function to start the next level
+            function nextLevel() {
+                if (currentLevel >= surahs.length) {
+                    showMessage("You Win!", "Congratulations! You've learned the first 10 Surahs of the Quran. Alhamdullilah!", "Restart");
+                    return;
+                }
+                
+                // Get current Surah and its number
+                currentSurah = surahs[currentLevel];
+                
+                // Clear existing bubbles
+                bubbles = [];
+
+                // Generate new random numbers from 1 to 10
+                let numbers = Array.from({ length: 10 }, (_, i) => i + 1);
+                
+                // Create the bubble objects with random positions
+                const bubbleRadius = Math.min(canvas.width, canvas.height) * 0.05;
+                const bubbleColors = ['#ffab91', '#80cbc4', '#aed581', '#ffcdd2', '#c5e1a5', '#b39ddb', '#4db6ac'];
+                for (let i = 0; i < numbers.length; i++) {
+                    const number = numbers[i];
+                    const x = Math.random() * (canvas.width - 2 * bubbleRadius) + bubbleRadius;
+                    const y = Math.random() * (canvas.height - 2 * bubbleRadius) + bubbleRadius;
+                    const color = bubbleColors[i % bubbleColors.length];
+                    bubbles.push(new Bubble(x, y, bubbleRadius, number, color));
+                }
+
+                isPaused = false;
+            }
+
+            // Handle mouse click event
+            canvas.addEventListener('click', function(event) {
+                if (isPaused) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+
+                // Check if any bubble was clicked
+                for (const bubble of bubbles) {
+                    const distance = Math.sqrt((mouseX - bubble.x) ** 2 + (mouseY - bubble.y) ** 2);
+                    if (distance < bubble.radius) {
+                        // Check if the correct bubble was clicked
+                        if (bubble.number === currentSurah.number) {
+                            createPopSound();
+                            // Generate magical particles at the bubble's location
+                            for (let i = 0; i < 50; i++) {
+                                particles.push(new Particle(bubble.x, bubble.y));
+                            }
+                            
+                            currentLevel++;
+                            setTimeout(nextLevel, 500); // Small delay before next level
+                        } else {
+                            createWrongSound();
+                        }
+                        return; // Exit the loop after finding a bubble
+                    }
+                }
+            });
+
+            // Handle window resize for responsiveness
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                draw(); // Redraw on resize
+            }
+
+            // Initialize the game
+            function startGame() {
+                hideMessage();
+                resizeCanvas();
+                currentLevel = 0;
+                nextLevel();
+                gameLoop();
+            }
+
+            restartBtn.addEventListener('click', startGame);
+
+            window.addEventListener('resize', resizeCanvas);
+            // The game no longer starts automatically on load; it waits for the user to click 'Play'
+        };
+    </script>
+</body>
+</html>
