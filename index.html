@@ -39,6 +39,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            white-space: pre-line;
         }
         #message-box h2 {
             font-size: 2.5rem;
@@ -49,9 +50,13 @@
             font-size: 1.25rem;
             color: #4a4a4a;
         }
+        .btn-container {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
         .btn {
             padding: 0.75rem 2rem;
-            margin-top: 1.5rem;
             border: none;
             border-radius: 50px;
             background-color: #64b5f6;
@@ -63,7 +68,7 @@
         }
         .btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            box-shadow: 6px 6px 20px rgba(0, 0, 0, 0.15);
         }
     </style>
 </head>
@@ -73,7 +78,9 @@
         <div id="message-box">
             <h2 id="message-title">Find the Surahs Number</h2>
             <p id="message-content">Click the number that matches the Surah's order in the Quran.</p>
-            <button id="restartBtn" class="btn">Play</button>
+            <div class="btn-container">
+                <button id="mainBtn" class="btn">Play</button>
+            </div>
         </div>
     </div>
 
@@ -85,10 +92,11 @@
             const messageBox = document.getElementById('message-box');
             const messageTitle = document.getElementById('message-title');
             const messageContent = document.getElementById('message-content');
-            const restartBtn = document.getElementById('restartBtn');
-            
+            const mainBtn = document.getElementById('mainBtn');
+            const btnContainer = document.querySelector('.btn-container');
+
             // Define game constants and variables
-            const surahs = [
+            const surahsLevel1 = [
                 { name: "Al-Fatiha", number: 1 },
                 { name: "Al-Baqarah", number: 2 },
                 { name: "Al-Imran", number: 3 },
@@ -100,15 +108,28 @@
                 { name: "At-Tawbah", number: 9 },
                 { name: "Yunus", number: 10 }
             ];
+            
+            const surahsLevel2 = [
+                { name: "Hud", number: 11 },
+                { name: "Yusuf", number: 12 },
+                { name: "Ar-Ra'd", number: 13 },
+                { name: "Ibrahim", number: 14 },
+                { name: "Al-Hijr", number: 15 },
+                { name: "An-Nahl", number: 16 },
+                { name: "Al-Isra", number: 17 },
+                { name: "Al-Kahf", number: 18 },
+                { name: "Maryam", number: 19 },
+                { name: "Ta-Ha", number: 20 }
+            ];
 
             let bubbles = [];
-            let particles = []; // New array for particles
+            let particles = [];
             let currentLevel = 0;
             let currentSurah = {};
             let isPaused = true;
             let audioContext;
-            let audioPop, audioWrong;
             let gameAnimationFrameId = null;
+            let currentSurahSet = surahsLevel1;
 
             // Define Bubble class for number objects
             class Bubble {
@@ -118,12 +139,11 @@
                     this.radius = radius;
                     this.number = number;
                     this.color = color;
-                    this.vx = (Math.random() - 0.5) * 2; // Random horizontal velocity
-                    this.vy = (Math.random() - 0.5) * 2; // Random vertical velocity
+                    this.vx = (Math.random() - 0.5) * 1.5; // Reduced speed for easier gameplay
+                    this.vy = (Math.random() - 0.5) * 1.5; // Reduced speed for easier gameplay
                 }
 
                 draw() {
-                    // Draw bubble circle
                     ctx.beginPath();
                     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                     ctx.fillStyle = this.color;
@@ -133,7 +153,6 @@
                     ctx.closePath();
                     ctx.shadowBlur = 0;
 
-                    // Draw number text inside bubble
                     ctx.fillStyle = '#fff';
                     ctx.font = `bold ${this.radius * 0.7}px 'Inter', sans-serif`;
                     ctx.textAlign = 'center';
@@ -142,11 +161,9 @@
                 }
 
                 update() {
-                    // Update position
                     this.x += this.vx;
                     this.y += this.vy;
 
-                    // Bounce off walls
                     if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
                         this.vx *= -1;
                     }
@@ -186,11 +203,44 @@
             }
 
             // Function to show a message box
-            function showMessage(title, content, buttonText) {
+            function showMessage(title, content, buttonText1, buttonText2) {
                 isPaused = true;
                 messageTitle.textContent = title;
                 messageContent.textContent = content;
-                restartBtn.textContent = buttonText;
+                mainBtn.textContent = buttonText1;
+                mainBtn.onclick = function() {
+                    if (mainBtn.textContent === 'Play' || mainBtn.textContent === 'Replay Level 1') {
+                        currentSurahSet = surahsLevel1;
+                        startGame(0);
+                    } else if (mainBtn.textContent === 'Restart') {
+                        currentSurahSet = surahsLevel1;
+                        startGame(0);
+                    }
+                };
+
+                // Create a second button if needed
+                if (buttonText2) {
+                    let secondBtn = document.getElementById('secondBtn');
+                    if (!secondBtn) {
+                        secondBtn = document.createElement('button');
+                        secondBtn.id = 'secondBtn';
+                        secondBtn.className = 'btn';
+                        btnContainer.appendChild(secondBtn);
+                    }
+                    secondBtn.textContent = buttonText2;
+                    secondBtn.onclick = function() {
+                        if (secondBtn.textContent === 'Go to Level 2') {
+                            currentSurahSet = surahsLevel2;
+                            startGame(0);
+                        }
+                    };
+                } else {
+                    const secondBtn = document.getElementById('secondBtn');
+                    if (secondBtn) {
+                        secondBtn.remove();
+                    }
+                }
+
                 messageBox.style.display = 'flex';
                 if (gameAnimationFrameId) {
                     cancelAnimationFrame(gameAnimationFrameId);
@@ -243,39 +293,41 @@
                 // Clear the canvas
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // Draw the central "cute block" with the Surah name
-                const blockWidth = canvas.width * 0.35;
-                const blockHeight = canvas.height * 0.15;
-                const blockX = (canvas.width - blockWidth) / 2;
-                const blockY = (canvas.height - blockHeight) / 2;
-                const cornerRadius = 20;
+                if (currentSurah.name) {
+                    // Draw the central "cute block" with the Surah name
+                    const blockWidth = canvas.width * 0.35;
+                    const blockHeight = canvas.height * 0.15;
+                    const blockX = (canvas.width - blockWidth) / 2;
+                    const blockY = (canvas.height - blockHeight) / 2;
+                    const cornerRadius = 20;
 
-                // Draw rounded rectangle
-                ctx.beginPath();
-                ctx.moveTo(blockX + cornerRadius, blockY);
-                ctx.lineTo(blockX + blockWidth - cornerRadius, blockY);
-                ctx.quadraticCurveTo(blockX + blockWidth, blockY, blockX + blockWidth, blockY + cornerRadius);
-                ctx.lineTo(blockX + blockWidth, blockY + blockHeight - cornerRadius);
-                ctx.quadraticCurveTo(blockX + blockWidth, blockY + blockHeight, blockX + blockWidth - cornerRadius, blockY + blockHeight);
-                ctx.lineTo(blockX + cornerRadius, blockY + blockHeight);
-                ctx.quadraticCurveTo(blockX, blockY + blockHeight, blockX, blockY + blockHeight - cornerRadius);
-                ctx.lineTo(blockX, blockY + cornerRadius);
-                ctx.quadraticCurveTo(blockX, blockY, blockX + cornerRadius, blockY);
-                ctx.closePath();
+                    // Draw rounded rectangle
+                    ctx.beginPath();
+                    ctx.moveTo(blockX + cornerRadius, blockY);
+                    ctx.lineTo(blockX + blockWidth - cornerRadius, blockY);
+                    ctx.quadraticCurveTo(blockX + blockWidth, blockY, blockX + blockWidth, blockY + cornerRadius);
+                    ctx.lineTo(blockX + blockWidth, blockY + blockHeight - cornerRadius);
+                    ctx.quadraticCurveTo(blockX + blockWidth, blockY + blockHeight, blockX + blockWidth - cornerRadius, blockY + blockHeight);
+                    ctx.lineTo(blockX + cornerRadius, blockY + blockHeight);
+                    ctx.quadraticCurveTo(blockX, blockY + blockHeight, blockX, blockY + blockHeight - cornerRadius);
+                    ctx.lineTo(blockX, blockY + cornerRadius);
+                    ctx.quadraticCurveTo(blockX, blockY, blockX + cornerRadius, blockY);
+                    ctx.closePath();
 
-                // Style the block
-                ctx.fillStyle = '#bbdefb'; /* Light blue block */
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-                ctx.shadowBlur = 15;
-                ctx.fill();
-                ctx.shadowBlur = 0;
+                    // Style the block
+                    ctx.fillStyle = '#bbdefb'; /* Light blue block */
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+                    ctx.shadowBlur = 15;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
 
-                // Draw the Surah text
-                ctx.fillStyle = '#1a237e'; /* Dark blue text */
-                ctx.font = `bold ${blockHeight * 0.4}px 'Inter', sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(currentSurah.name, canvas.width / 2, canvas.height / 2);
+                    // Draw the Surah text
+                    ctx.fillStyle = '#1a237e'; /* Dark blue text */
+                    ctx.font = `bold ${blockHeight * 0.4}px 'Inter', sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(currentSurah.name, canvas.width / 2, canvas.height / 2);
+                }
 
                 // Draw and update bubbles
                 for (const bubble of bubbles) {
@@ -310,22 +362,34 @@
             
             // Function to start the next level
             function nextLevel() {
-                if (currentLevel >= surahs.length) {
-                    showMessage("You Win!", "Congratulations! You've learned the first 10 Surahs of the Quran. Alhamdullilah!", "Restart");
+                if (currentLevel >= currentSurahSet.length) {
+                    if (currentSurahSet === surahsLevel1) {
+                        showMessage(
+                            "Level 1 Complete!",
+                            "You have successfully learned the first 10 Surahs!",
+                            "Replay Level 1",
+                            "Go to Level 2"
+                        );
+                    } else {
+                        showMessage("You Win!", "Congratulations! You've learned the first 20 Surahs of the Quran. Alhamdullilah!", "Restart");
+                    }
                     return;
                 }
                 
-                // Get current Surah and its number
-                currentSurah = surahs[currentLevel];
-                
-                // Clear existing bubbles
+                currentSurah = currentSurahSet[currentLevel];
                 bubbles = [];
 
-                // Generate new random numbers from 1 to 10
-                let numbers = Array.from({ length: 10 }, (_, i) => i + 1);
+                // Correctly generate numbers for the current Surah set
+                const startNumber = currentSurahSet[0].number;
+                const numbers = Array.from({ length: 10 }, (_, i) => startNumber + i);
+
+                // Shuffle the numbers for randomness
+                for (let i = numbers.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+                }
                 
-                // Create the bubble objects with random positions
-                const bubbleRadius = Math.min(canvas.width, canvas.height) * 0.05;
+                const bubbleRadius = Math.min(canvas.width, canvas.height) * 0.07; // Increased bubble size
                 const bubbleColors = ['#ffab91', '#80cbc4', '#aed581', '#ffcdd2', '#c5e1a5', '#b39ddb', '#4db6ac'];
                 for (let i = 0; i < numbers.length; i++) {
                     const number = numbers[i];
@@ -338,56 +402,75 @@
                 isPaused = false;
             }
 
-            // Handle mouse click event
-            canvas.addEventListener('click', function(event) {
+            // Function to get the correct coordinates from a mouse or touch event
+            function getCoords(event) {
+                const rect = canvas.getBoundingClientRect();
+                if (event.touches) {
+                    return {
+                        x: event.touches[0].clientX - rect.left,
+                        y: event.touches[0].clientY - rect.top
+                    };
+                }
+                return {
+                    x: event.clientX - rect.left,
+                    y: event.clientY - rect.top
+                };
+            }
+
+            // Handle input (mouse click or touch)
+            function handleInput(event) {
                 if (isPaused) return;
 
-                const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
+                const coords = getCoords(event);
+                const mouseX = coords.x;
+                const mouseY = coords.y;
 
-                // Check if any bubble was clicked
                 for (const bubble of bubbles) {
                     const distance = Math.sqrt((mouseX - bubble.x) ** 2 + (mouseY - bubble.y) ** 2);
-                    if (distance < bubble.radius) {
-                        // Check if the correct bubble was clicked
+                    // Check if the distance is within the bubble's radius plus a small buffer
+                    if (distance < bubble.radius + 10) { 
                         if (bubble.number === currentSurah.number) {
                             createPopSound();
-                            // Generate magical particles at the bubble's location
                             for (let i = 0; i < 50; i++) {
                                 particles.push(new Particle(bubble.x, bubble.y));
                             }
                             
                             currentLevel++;
-                            setTimeout(nextLevel, 500); // Small delay before next level
+                            setTimeout(nextLevel, 500);
                         } else {
                             createWrongSound();
                         }
-                        return; // Exit the loop after finding a bubble
+                        return;
                     }
                 }
-            });
+            }
+
+            canvas.addEventListener('click', handleInput);
+            canvas.addEventListener('touchstart', handleInput);
 
             // Handle window resize for responsiveness
             function resizeCanvas() {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
-                draw(); // Redraw on resize
+                draw();
             }
 
             // Initialize the game
-            function startGame() {
+            function startGame(level) {
                 hideMessage();
                 resizeCanvas();
-                currentLevel = 0;
+                currentLevel = level;
                 nextLevel();
                 gameLoop();
             }
 
-            restartBtn.addEventListener('click', startGame);
+            mainBtn.addEventListener('click', () => {
+                if (mainBtn.textContent === 'Play') {
+                    startGame(0);
+                }
+            });
 
             window.addEventListener('resize', resizeCanvas);
-            // The game no longer starts automatically on load; it waits for the user to click 'Play'
         };
     </script>
 </body>
