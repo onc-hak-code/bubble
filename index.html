@@ -295,8 +295,14 @@
 
                 if (currentSurah.name) {
                     // Draw the central "cute block" with the Surah name
-                    const blockWidth = canvas.width * 0.35;
-                    const blockHeight = canvas.height * 0.15;
+                    const fontHeight = Math.min(canvas.width, canvas.height) * 0.05;
+                    ctx.font = `bold ${fontHeight}px 'Inter', sans-serif`;
+                    const textMetrics = ctx.measureText(currentSurah.name);
+                    const textWidth = textMetrics.width;
+
+                    const padding = canvas.width * 0.05;
+                    const blockWidth = Math.max(textWidth + padding, canvas.width * 0.25);
+                    const blockHeight = fontHeight * 2;
                     const blockX = (canvas.width - blockWidth) / 2;
                     const blockY = (canvas.height - blockHeight) / 2;
                     const cornerRadius = 20;
@@ -323,7 +329,6 @@
 
                     // Draw the Surah text
                     ctx.fillStyle = '#1a237e'; /* Dark blue text */
-                    ctx.font = `bold ${blockHeight * 0.4}px 'Inter', sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(currentSurah.name, canvas.width / 2, canvas.height / 2);
@@ -420,6 +425,11 @@
             // Handle input (mouse click or touch)
             function handleInput(event) {
                 if (isPaused) return;
+                
+                // Prevent default touch behavior to avoid duplicate click event on mobile
+                if (event.type === 'touchstart') {
+                    event.preventDefault();
+                }
 
                 const coords = getCoords(event);
                 const mouseX = coords.x;
