@@ -52,6 +52,8 @@
         }
         .btn-container {
             display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
             gap: 1rem;
             margin-top: 1.5rem;
         }
@@ -65,21 +67,58 @@
             cursor: pointer;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s, box-shadow 0.2s;
+            min-width: 150px;
         }
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 6px 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        #pause-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            z-index: 50;
+        }
+
+        #pause-btn:hover {
+            transform: scale(1.05);
+        }
+
+        #pause-btn svg {
+            fill: #1a237e;
+            width: 24px;
+            height: 24px;
         }
     </style>
 </head>
 <body>
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
+        <button id="pause-btn" style="display:none;">
+            <svg viewBox="0 0 24 24">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+        </button>
         <div id="message-box">
             <h2 id="message-title">Find the Surahs Number</h2>
             <p id="message-content">Click the number that matches the Surah's order in the Quran.</p>
             <div class="btn-container">
-                <button id="mainBtn" class="btn">Play</button>
+                <button id="level1Btn" class="btn">Level 1</button>
+                <button id="level2Btn" class="btn">Level 2</button>
+                <button id="level3Btn" class="btn">Level 3</button>
+                <button id="level4Btn" class="btn">Level 4</button>
             </div>
         </div>
     </div>
@@ -92,14 +131,14 @@
             const messageBox = document.getElementById('message-box');
             const messageTitle = document.getElementById('message-title');
             const messageContent = document.getElementById('message-content');
-            const mainBtn = document.getElementById('mainBtn');
             const btnContainer = document.querySelector('.btn-container');
+            const pauseBtn = document.getElementById('pause-btn');
 
             // Define game constants and variables
             const surahsLevel1 = [
                 { name: "Al-Fatiha", number: 1 },
                 { name: "Al-Baqarah", number: 2 },
-                { name: "Al-Imran", number: 3 },
+                { name: "Ali-Imran", number: 3 },
                 { name: "An-Nisa", number: 4 },
                 { name: "Al-Ma'idah", number: 5 },
                 { name: "Al-An'am", number: 6 },
@@ -122,14 +161,42 @@
                 { name: "Ta-Ha", number: 20 }
             ];
 
+            const surahsLevel3 = [
+                { name: "Al-Anbiya", number: 21 },
+                { name: "Al-Hajj", number: 22 },
+                { name: "Al-Mu'minun", number: 23 },
+                { name: "An-Nur", number: 24 },
+                { name: "Al-Furqan", number: 25 },
+                { name: "Ash-Shu'ara", number: 26 },
+                { name: "An-Naml", number: 27 },
+                { name: "Al-Qasas", number: 28 },
+                { name: "Al-'Ankabut", number: 29 },
+                { name: "Ar-Rum", number: 30 }
+            ];
+
+            const surahsLevel4 = [
+                { name: "Luqman", number: 31 },
+                { name: "As-Sajdah", number: 32 },
+                { name: "Al-Ahzab", number: 33 },
+                { name: "Saba", number: 34 },
+                { name: "Fatir", number: 35 },
+                { name: "Ya-Sin", number: 36 },
+                { name: "As-Saffat", number: 37 },
+                { name: "Sad", number: 38 },
+                { name: "Az-Zumar", number: 39 },
+                { name: "Ghafir", number: 40 }
+            ];
+            
+            const allSurahLevels = [surahsLevel1, surahsLevel2, surahsLevel3, surahsLevel4];
+            
             let bubbles = [];
             let particles = [];
-            let currentLevel = 0;
+            let currentLevelIndex = 0; // Use an index to track progress within a surah set
             let currentSurah = {};
             let isPaused = true;
             let audioContext;
             let gameAnimationFrameId = null;
-            let currentSurahSet = surahsLevel1;
+            let currentSurahSet = [];
 
             // Define Bubble class for number objects
             class Bubble {
@@ -203,43 +270,25 @@
             }
 
             // Function to show a message box
-            function showMessage(title, content, buttonText1, buttonText2) {
+            function showMessage(title, content, buttonConfig) {
                 isPaused = true;
                 messageTitle.textContent = title;
                 messageContent.textContent = content;
-                mainBtn.textContent = buttonText1;
-                mainBtn.onclick = function() {
-                    if (mainBtn.textContent === 'Play' || mainBtn.textContent === 'Replay Level 1') {
-                        currentSurahSet = surahsLevel1;
-                        startGame(0);
-                    } else if (mainBtn.textContent === 'Restart') {
-                        currentSurahSet = surahsLevel1;
-                        startGame(0);
-                    }
-                };
 
-                // Create a second button if needed
-                if (buttonText2) {
-                    let secondBtn = document.getElementById('secondBtn');
-                    if (!secondBtn) {
-                        secondBtn = document.createElement('button');
-                        secondBtn.id = 'secondBtn';
-                        secondBtn.className = 'btn';
-                        btnContainer.appendChild(secondBtn);
-                    }
-                    secondBtn.textContent = buttonText2;
-                    secondBtn.onclick = function() {
-                        if (secondBtn.textContent === 'Go to Level 2') {
-                            currentSurahSet = surahsLevel2;
-                            startGame(0);
-                        }
-                    };
-                } else {
-                    const secondBtn = document.getElementById('secondBtn');
-                    if (secondBtn) {
-                        secondBtn.remove();
-                    }
-                }
+                // Hide the pause button when a message box is shown
+                pauseBtn.style.display = 'none';
+
+                // Clear existing buttons
+                btnContainer.innerHTML = '';
+                
+                // Create buttons based on the config array
+                buttonConfig.forEach(config => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn';
+                    btn.textContent = config.text;
+                    btn.onclick = config.action;
+                    btnContainer.appendChild(btn);
+                });
 
                 messageBox.style.display = 'flex';
                 if (gameAnimationFrameId) {
@@ -251,6 +300,7 @@
             function hideMessage() {
                 isPaused = false;
                 messageBox.style.display = 'none';
+                pauseBtn.style.display = 'flex'; // Show the pause button when the game is not paused
                 gameLoop();
             }
 
@@ -365,36 +415,37 @@
                 gameAnimationFrameId = requestAnimationFrame(gameLoop);
             }
             
-            // Function to start the next level
-            function nextLevel() {
-                if (currentLevel >= currentSurahSet.length) {
-                    if (currentSurahSet === surahsLevel1) {
-                        showMessage(
-                            "Level 1 Complete!",
-                            "You have successfully learned the first 10 Surahs!",
-                            "Replay Level 1",
-                            "Go to Level 2"
-                        );
-                    } else {
-                        showMessage("You Win!", "Congratulations! You've learned the first 20 Surahs of the Quran. Alhamdullilah!", "Restart");
+            // Function to start the next surah within a level
+            function nextSurah() {
+                if (currentLevelIndex >= currentSurahSet.length) {
+                    let levelNumber = allSurahLevels.indexOf(currentSurahSet) + 1;
+                    const nextLevelSet = allSurahLevels[levelNumber];
+                    
+                    const buttonConfig = [
+                        { text: `Replay Level ${levelNumber}`, action: () => startGame(currentSurahSet, 0) }
+                    ];
+
+                    if (nextLevelSet) {
+                         buttonConfig.push({ text: `Go to Level ${levelNumber + 1}`, action: () => startGame(nextLevelSet, 0) });
                     }
+                    buttonConfig.push({ text: 'Back to Menu', action: showLevelSelection });
+
+                    showMessage(`Level ${levelNumber} Complete!`, "You've successfully learned this set of Surahs!", buttonConfig);
                     return;
                 }
                 
-                currentSurah = currentSurahSet[currentLevel];
+                currentSurah = currentSurahSet[currentLevelIndex];
                 bubbles = [];
 
-                // Correctly generate numbers for the current Surah set
                 const startNumber = currentSurahSet[0].number;
                 const numbers = Array.from({ length: 10 }, (_, i) => startNumber + i);
 
-                // Shuffle the numbers for randomness
                 for (let i = numbers.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
                 }
                 
-                const bubbleRadius = Math.min(canvas.width, canvas.height) * 0.07; // Increased bubble size
+                const bubbleRadius = Math.min(canvas.width, canvas.height) * 0.07;
                 const bubbleColors = ['#ffab91', '#80cbc4', '#aed581', '#ffcdd2', '#c5e1a5', '#b39ddb', '#4db6ac'];
                 for (let i = 0; i < numbers.length; i++) {
                     const number = numbers[i];
@@ -426,7 +477,6 @@
             function handleInput(event) {
                 if (isPaused) return;
                 
-                // Prevent default touch behavior to avoid duplicate click event on mobile
                 if (event.type === 'touchstart') {
                     event.preventDefault();
                 }
@@ -437,7 +487,6 @@
 
                 for (const bubble of bubbles) {
                     const distance = Math.sqrt((mouseX - bubble.x) ** 2 + (mouseY - bubble.y) ** 2);
-                    // Check if the distance is within the bubble's radius plus a small buffer
                     if (distance < bubble.radius + 10) { 
                         if (bubble.number === currentSurah.number) {
                             createPopSound();
@@ -445,8 +494,8 @@
                                 particles.push(new Particle(bubble.x, bubble.y));
                             }
                             
-                            currentLevel++;
-                            setTimeout(nextLevel, 500);
+                            currentLevelIndex++;
+                            setTimeout(nextSurah, 500);
                         } else {
                             createWrongSound();
                         }
@@ -465,21 +514,39 @@
                 draw();
             }
 
-            // Initialize the game
-            function startGame(level) {
+            // Function to start the game with a specific surah set and starting index
+            function startGame(surahSet, startIndex) {
                 hideMessage();
                 resizeCanvas();
-                currentLevel = level;
-                nextLevel();
+                currentSurahSet = surahSet;
+                currentLevelIndex = startIndex;
+                nextSurah();
                 gameLoop();
             }
 
-            mainBtn.addEventListener('click', () => {
-                if (mainBtn.textContent === 'Play') {
-                    startGame(0);
-                }
+            // Function to show the level selection menu
+            function showLevelSelection() {
+                const buttons = [
+                    { text: 'Level 1 (1-10)', action: () => startGame(surahsLevel1, 0) },
+                    { text: 'Level 2 (11-20)', action: () => startGame(surahsLevel2, 0) },
+                    { text: 'Level 3 (21-30)', action: () => startGame(surahsLevel3, 0) },
+                    { text: 'Level 4 (31-40)', action: () => startGame(surahsLevel4, 0) }
+                ];
+                showMessage('Choose a Level', 'Select a Surah set to begin.', buttons);
+            }
+
+            // Show a pause menu when the pause button is clicked
+            pauseBtn.addEventListener('click', () => {
+                const buttons = [
+                    { text: 'Keep Playing', action: hideMessage },
+                    { text: 'Choose Level', action: showLevelSelection }
+                ];
+                showMessage('Game Paused', 'What would you like to do?', buttons);
             });
 
+            // Initial call to show the level selection menu
+            showLevelSelection();
+            
             window.addEventListener('resize', resizeCanvas);
         };
     </script>
